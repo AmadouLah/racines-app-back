@@ -8,13 +8,19 @@ import com.racines_app_back.www.domain.dto.PersonUpdateDTO;
 import com.racines_app_back.www.domain.dto.RelationshipDTO;
 import com.racines_app_back.www.domain.enums.RelationshipType;
 import com.racines_app_back.www.service.CurrentUserService;
+import com.racines_app_back.www.service.FamilyTreeExportService;
 import com.racines_app_back.www.service.PersonService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +31,7 @@ public class PersonController {
 
     private final PersonService personService;
     private final CurrentUserService currentUserService;
+    private final FamilyTreeExportService familyTreeExportService;
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PersonDTO>> getPerson(@PathVariable UUID id) {
@@ -38,6 +45,24 @@ public class PersonController {
         UUID userId = currentUserService.getCurrentUserId();
         FamilyTreeDTO familyTree = personService.getFamilyTree(id, userId);
         return ResponseEntity.ok(ApiResponse.success(familyTree));
+    }
+
+    @GetMapping("/{id}/family-tree/export")
+    public ResponseEntity<Resource> exportFamilyTree(@PathVariable UUID id) throws IOException {
+        UUID userId = currentUserService.getCurrentUserId();
+        byte[] pdfContent = familyTreeExportService.exportToPdf(id, userId);
+        
+        PersonDTO person = personService.getPersonById(id, userId);
+        String filename = String.format("arbre-%s-%s-%s.pdf", 
+                person.getNom(), person.getPrenom(), id.toString().substring(0, 8));
+        
+        ByteArrayResource resource = new ByteArrayResource(pdfContent);
+        
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdfContent.length)
+                .body(resource);
     }
 
     @PostMapping

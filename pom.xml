@@ -116,6 +116,11 @@
 			<version>2.7.0</version>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+		<dependency>
 			<groupId>org.mapstruct</groupId>
 			<artifactId>mapstruct</artifactId>
 			<version>1.5.5.Final</version>
@@ -158,6 +163,9 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<profiles>
+						<profile>local</profile>
+					</profiles>
 				</configuration>
 			</plugin>
 		</plugins>
