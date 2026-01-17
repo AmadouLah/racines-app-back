@@ -33,6 +33,15 @@ public class PersonController {
     private final CurrentUserService currentUserService;
     private final FamilyTreeExportService familyTreeExportService;
 
+    @GetMapping("/public/tree")
+    public ResponseEntity<ApiResponse<FamilyTreeDTO>> getPublicTree() {
+        FamilyTreeDTO familyTree = personService.getPublicTree();
+        if (familyTree == null) {
+            return ResponseEntity.ok(ApiResponse.error("Aucun arbre public disponible"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(familyTree));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PersonDTO>> getPerson(@PathVariable UUID id) {
         UUID userId = currentUserService.getCurrentUserId();

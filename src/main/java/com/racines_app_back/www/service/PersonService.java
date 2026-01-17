@@ -8,8 +8,11 @@ import com.racines_app_back.www.domain.dto.RelationshipDTO;
 import com.racines_app_back.www.domain.entity.FamilyRelationship;
 import com.racines_app_back.www.domain.entity.Person;
 import com.racines_app_back.www.domain.enums.RelationshipType;
+import com.racines_app_back.www.domain.entity.User;
+import com.racines_app_back.www.domain.enums.Role;
 import com.racines_app_back.www.domain.repository.FamilyRelationshipRepository;
 import com.racines_app_back.www.domain.repository.PersonRepository;
+import com.racines_app_back.www.domain.repository.UserRepository;
 import com.racines_app_back.www.exception.InvalidRelationshipException;
 import com.racines_app_back.www.exception.PersonNotFoundException;
 import com.racines_app_back.www.service.mapper.PersonMapper;
@@ -27,6 +30,7 @@ public class PersonService {
 
     private final PersonRepository personRepository;
     private final FamilyRelationshipRepository relationshipRepository;
+    private final UserRepository userRepository;
     private final PermissionService permissionService;
     private final PersonMapper personMapper;
 
@@ -223,5 +227,92 @@ public class PersonService {
             }
         }
         return descendants;
+    }
+
+    public FamilyTreeDTO getPublicTree() {
+        Optional<User> adminUser = userRepository.findAll().stream()
+                .filter(user -> user.getRole() == Role.SUPER_ADMIN && user.getPersonId() != null)
+                .findFirst();
+        
+        UUID rootPersonId;
+        if (adminUser.isPresent()) {
+            rootPersonId = adminUser.get().getPersonId();
+        } else {
+            List<Person> publicPersons = personRepository.findByIsPublicTrue();
+            if (publicPersons.isEmpty()) {
+                return null;
+            }
+            rootPersonId = publicPersons.get(0).getId();
+        }
+        
+        return getFamilyTreePublic(rootPersonId);
+    }
+
+    private FamilyTreeDTO getFamilyTreePublic(UUID personId) {
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new PersonNotFoundException("Personne non trouvée: " + personId));
+
+        List<FamilyRelationship> allRelationships = relationshipRepository.findAllRelationshipsByPersonId(personId);
+        
+        Set<UUID> relatedPersonIds = new HashSet<>();
+        relatedPersonIds.add(personId);
+        
+        for (FamilyRelationship rel : allRelationships) {
+            relatedPersonIds.add(rel.getPerson1Id());
+            relatedPersonIds.add(rel.getPerson2Id());
+        }
+
+        List<Person> relatedPersons = personRepository.findAllById(relatedPersonIds);
+        Map<UUID, Person> personMap = relatedPersons.stream()
+                .filter(p -> p.getIsPublic() || personId.equals(p.getId()))
+                .collect(Collectors.toMap(Person::getId, p -> p));
+
+        List<PersonDTO> parents = new ArrayList<>();
+        List<PersonDTO> grandparents = new ArrayList<>();
+        List<PersonDTO> siblings = new ArrayList<>();
+
+        for (FamilyRelationship rel : allRelationships) {
+            UUID otherPersonId = rel.getPerson1Id().equals(personId) ? rel.getPerson2Id() : rel.getPerson1Id();
+            Person otherPerson = personMap.get(otherPersonId);
+            
+            if (otherPerson != null && (otherPerson.getIsPublic() || otherPersonId.equals(personId))) {
+                PersonDTO otherDTO = personMapper.toDTO(otherPerson);
+                
+                if (rel.getRelationshipType() == RelationshipType.PARENT) {
+                    parents.add(otherDTO);
+                } else if (rel.getRelationshipType() == RelationshipType.SIBLING) {
+                    siblings.add(otherDTO);
+                }
+            }
+        }
+
+        for (PersonDTO parent : parents) {
+            List<FamilyRelationship> parentRelationships = relationshipRepository
+                    .findAllRelationshipsByPersonId(parent.getId());
+            for (FamilyRelationship rel : parentRelationships) {
+                if (rel.getRelationshipType() == RelationshipType.PARENT) {
+                    UUID grandparentId = rel.getPerson1Id().equals(parent.getId()) 
+                            ? rel.getPerson2Id() 
+                            : rel.getPerson1Id();
+                    Person grandparent = personMap.get(grandparentId);
+                    if (grandparent != null && grandparent.getIsPublic()) {
+                        PersonDTO grandparentDTO = personMapper.toDTO(grandparent);
+                        if (!grandparents.contains(grandparentDTO)) {
+                            grandparents.add(grandparentDTO);
+                        }
+                    }
+                }
+            }
+        }
+
+        List<RelationshipDTO> relationships = personMapper.toRelationshipDTOList(allRelationships);
+
+        return FamilyTreeDTO.builder()
+                .person(personMapper.toDTO(person))
+                .parents(parents)
+                .grandparents(grandparents)
+                .siblings(siblings)
+                .relationships(relationships)
+                .build();
     }
 }

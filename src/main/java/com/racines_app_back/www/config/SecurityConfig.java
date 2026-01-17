@@ -1,6 +1,7 @@
 package com.racines_app_back.www.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -29,20 +30,21 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> 
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/favicon.ico").permitAll()
                         .requestMatchers("/api/auth/**", "/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/api/persons/public/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/**").authenticated()
-                        .anyRequest().permitAll()
-                );
+                        .anyRequest().permitAll());
 
         if (isOAuth2Configured()) {
-            http.oauth2Login(oauth2 -> oauth2
-                    .defaultSuccessUrl("/api/auth/success", true)
-                    .failureUrl("/api/auth/failure")
-            );
+            http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                    .oauth2Login(oauth2 -> oauth2
+                            .defaultSuccessUrl("/api/auth/success", true)
+                            .failureUrl("/api/auth/failure"));
+        } else {
+            http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         }
 
         return http.build();
