@@ -64,8 +64,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        String resourcePath = ex.getResourcePath();
+        if (resourcePath != null && (resourcePath.startsWith("/oauth2/") || resourcePath.startsWith("/login/oauth2/"))) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Endpoint OAuth2 non disponible. Vérifiez la configuration OAuth2."));
+        }
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Ressource non trouvée: " + ex.getResourcePath()));
+                .body(ApiResponse.error("Ressource non trouvée: " + resourcePath));
     }
 
     @ExceptionHandler(Exception.class)

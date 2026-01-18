@@ -19,23 +19,32 @@ public class CurrentUserService {
 
     public UUID getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new UserNotFoundException("Utilisateur non authentifié");
-        }
+        
+        if (authentication != null && authentication.isAuthenticated()) {
+            if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
+                String email = oauth2User.getAttribute("email");
+                if (email != null) {
+                    User user = userRepository.findByEmail(email)
+                            .orElseThrow(() -> new UserNotFoundException("Utilisateur non trouvé avec l'email: " + email));
+                    return user.getId();
+                }
+            }
+            
+            if (authentication.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
+                String email = userDetails.getUsername();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new UserNotFoundException("Utilisateur non trouvé avec l'email: " + email));
+                return user.getId();
+            }
 
-        // Si l'authentification est OAuth2
-        if (authentication.getPrincipal() instanceof OAuth2User oauth2User) {
-            String email = oauth2User.getAttribute("email");
-            if (email != null) {
+            if (authentication.getPrincipal() instanceof String email) {
                 User user = userRepository.findByEmail(email)
                         .orElseThrow(() -> new UserNotFoundException("Utilisateur non trouvé avec l'email: " + email));
                 return user.getId();
             }
         }
 
-        // Pour l'instant, on retourne un UUID par défaut
-        // Dans une implémentation complète, on devrait gérer différents types d'authentification
-        throw new UserNotFoundException("Impossible de déterminer l'utilisateur actuel");
+        throw new UserNotFoundException("Utilisateur non authentifié");
     }
 
     public User getCurrentUser() {

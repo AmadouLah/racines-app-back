@@ -49,6 +49,15 @@ public class User {
     @Column(name = "oauth2_provider_id")
     private String oauth2ProviderId;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    @Column(name = "otp_code")
+    private String otpCode;
+
+    @Column(name = "otp_expires_at")
+    private LocalDateTime otpExpiresAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
